@@ -1,4 +1,5 @@
 import os
+import re
 
 import svn.common
 import svn.local
@@ -6,10 +7,15 @@ import svn.remote
 import svn.constants
 
 def get_client(url_or_path, *args, **kwargs):
-    if url_or_path[0] == '/':
-        return svn.local.LocalClient(url_or_path, *args, **kwargs)
-    else:
-        return svn.remote.RemoteClient(url_or_path, *args, **kwargs)
+    url_regex = re.compile(
+        r'^(?:http|ftp)s?://' # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' #domain...
+        r'localhost|' #localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # ...or ip
+        r'(?::\d+)?' # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+    return svn.remote.RemoteClient(url_or_path, *args, **kwargs) if re.match(url_regex, url_or_path) else svn.local.LocalClient(url_or_path, *args, **kwargs)
 
 def get_common_for_cwd():
     path = os.getcwd()
