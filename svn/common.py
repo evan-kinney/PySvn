@@ -2,7 +2,7 @@ import collections
 import logging
 import os
 import subprocess
-import xml.etree.ElementTree
+import xml.etree.ElementTree as ElementTree
 
 import dateutil.parser
 
@@ -52,7 +52,7 @@ class CommonClient(svn.common_base.CommonBase):
 
     def __element_text(self, element):
         """Return ElementTree text or None
-        :param xml.etree.ElementTree element: ElementTree to get text.
+        :param ElementTree element: ElementTree to get text.
 
         :return str|None: Element text
         """
@@ -76,7 +76,7 @@ class CommonClient(svn.common_base.CommonBase):
             cmd,
             do_combine=True)
 
-        root = xml.etree.ElementTree.fromstring(result)
+        root = ElementTree.fromstring(result)
 
         entry_attr = root.find('entry').attrib
         commit_attr = root.find('entry/commit').attrib
@@ -152,7 +152,7 @@ class CommonClient(svn.common_base.CommonBase):
             do_combine=True)
 
         # query the proper list of this path
-        root = xml.etree.ElementTree.fromstring(result)
+        root = ElementTree.fromstring(result)
         target_elem = root.find('target')
         property_names = [p.attrib["name"]
                           for p in target_elem.findall('property')]
@@ -165,7 +165,7 @@ class CommonClient(svn.common_base.CommonBase):
                 'propget',
                 ['--xml', property_name, full_url_or_path, ],
                 do_combine=True)
-            root = xml.etree.ElementTree.fromstring(result)
+            root = ElementTree.fromstring(result)
             target_elem = root.find('target')
             property_elem = target_elem.find('property')
             property_dict[property_name] = property_elem.text
@@ -182,7 +182,7 @@ class CommonClient(svn.common_base.CommonBase):
     def log_default(self, timestamp_from_dt=None, timestamp_to_dt=None,
                     limit=None, rel_filepath=None, stop_on_copy=False,
                     revision_from=None, revision_to=None, changelist=False,
-                    use_merge_history=False):
+                    use_merge_history=False, xml=True):
         """Allow for the most-likely kind of log listing: the complete list,
         a FROM and TO timestamp, a FROM timestamp only, or a quantity limit.
         """
@@ -236,43 +236,51 @@ class CommonClient(svn.common_base.CommonBase):
         if changelist is True:
             args += ['--verbose']
 
+        if xml is True:
+            args += ['--xml']
+
         result = self.run_command(
             'log',
-            args + ['--xml', full_url_or_path],
+            args + [full_url_or_path],
             do_combine=True)
 
-        root = xml.etree.ElementTree.fromstring(result)
-        named_fields = ['date', 'msg', 'revision', 'author', 'changelist']
-        c = collections.namedtuple(
-            'LogEntry',
-            named_fields)
+        if xml is True:
+            root = ElementTree.fromstring(result)
+            named_fields = ['date', 'msg', 'revision', 'author', 'changelist']
+            c = collections.namedtuple(
+                'LogEntry',
+                named_fields)
 
-        # Merge history can create nested log entries, so use iter instead of findall
-        for e in root.iter('logentry'):
-            entry_info = {x.tag: x.text for x in list(e)}
+            # Merge history can create nested log entries, so use iter instead of findall
+            for e in root.iter('logentry'):
+                entry_info = {x.tag: x.text for x in list(e)}
 
-            date = None
-            date_text = entry_info.get('date')
-            if date_text is not None:
-                date = dateutil.parser.parse(date_text)
+                date = None
+                date_text = entry_info.get('date')
+                if date_text is not None:
+                    date = dateutil.parser.parse(date_text)
 
-            log_entry = {
-                'msg': entry_info.get('msg'),
-                'author': entry_info.get('author'),
-                'revision': int(e.get('revision')),
-                'date': date
-            }
+                log_entry = {
+                    'msg': entry_info.get('msg'),
+                    'author': entry_info.get('author'),
+                    'revision': int(e.get('revision')),
+                    'date': date
+                }
 
-            if changelist is True:
-                cl = []
-                for ch in e.findall('paths/path'):
-                    cl.append((ch.attrib['action'], ch.text))
+                if changelist is True:
+                    cl = []
+                    for ch in e.findall('paths/path'):
+                        cl.append((ch.attrib['action'], ch.text))
 
-                log_entry['changelist'] = cl
-            else:
-                log_entry['changelist'] = None
+                    log_entry['changelist'] = cl
+                else:
+                    log_entry['changelist'] = None
 
-            yield c(**log_entry)
+                yield c(**log_entry)
+        else:
+            log_entries = result.split('------------------------------------------------------------------------')
+            for log_entry in log_entries:
+                yield log_entry
 
     def export(self, to_path, revision=None, force=False):
         cmd = []
@@ -304,7 +312,7 @@ class CommonClient(svn.common_base.CommonBase):
                 ['--xml', full_url_or_path],
                 do_combine=True)
 
-            root = xml.etree.ElementTree.fromstring(raw)
+            root = ElementTree.fromstring(raw)
 
             list_ = root.findall('list/entry')
             for entry in list_:
@@ -399,7 +407,7 @@ class CommonClient(svn.common_base.CommonBase):
             arguments,
             do_combine=True)
 
-        root = xml.etree.ElementTree.fromstring(result)
+        root = ElementTree.fromstring(result)
 
         diff = []
         for element in root.findall('paths/path'):

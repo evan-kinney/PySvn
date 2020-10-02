@@ -74,7 +74,7 @@ class LocalClient(svn.common.CommonClient):
             ['--xml', path],
             do_combine=True)
 
-        root = xml.etree.ElementTree.fromstring(raw)
+        root = ElementTree.fromstring(raw)
 
         list_ = root.findall('target/entry')
         for entry in list_:
