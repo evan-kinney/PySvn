@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import xml.etree.ElementTree as ElementTree
+import re
 
 import dateutil.parser
 
@@ -589,3 +590,16 @@ class CommonClient(svn.common_base.CommonBase):
                 "Only the local-client has access to the path.")
 
         return self.__url_or_path
+
+    def origin(self, rel_path=None):
+        try:
+            for e in self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False) if not rel_path else self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False, rel_path=None):
+                e = os.linesep.join([s for s in e.splitlines() if s])
+                s = e.splitlines()
+                if len(s) >= 1:
+                    for l in s:
+                        r = re.search('(?<=from\s).*(?=:)', l)
+                        if r:
+                            return r.group(0)
+        except (EnvironmentError, OSError):
+            return None
