@@ -10,6 +10,7 @@ import dateutil.parser
 import svn.constants
 import svn.exception
 import svn.common_base
+from svn.exception import SvnException
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class CommonClient(svn.common_base.CommonBase):
         self.__env = env
 
         if type_ not in (svn.constants.LT_URL, svn.constants.LT_PATH):
-            raise svn.exception.SvnException("Type is invalid: {}".format(type_))
+            raise SvnException("Type is invalid: {}".format(type_))
 
         self.__type = type_
 
@@ -592,14 +593,11 @@ class CommonClient(svn.common_base.CommonBase):
         return self.__url_or_path
 
     def origin(self, rel_path=None):
-        try:
-            for e in self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False) if not rel_path else self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False, rel_path=None):
-                e = os.linesep.join([s for s in e.splitlines() if s])
-                s = e.splitlines()
-                if len(s) >= 1:
-                    for l in s:
-                        r = re.search('(?<=from\s).*(?=:)', l)
-                        if r:
-                            return r.group(0)
-        except (EnvironmentError, OSError):
-            return None
+        for e in self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False) if not rel_path else self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False, rel_path=None):
+            e = os.linesep.join([s for s in e.splitlines() if s])
+            s = e.splitlines()
+            if len(s) >= 1:
+                for l in s:
+                    r = re.search('(?<=from\s).*(?=:)', l)
+                    if r:
+                        return r.group(0)
