@@ -10,6 +10,7 @@ import dateutil.parser
 import svn.constants
 import svn.exception
 import svn.common_base
+import svn.utility
 from svn.exception import SvnException
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,15 +40,17 @@ class CommonClient(svn.common_base.CommonBase):
         self.__type = type_
 
     def run_command(self, subcommand, args, **kwargs):
-        cmd = [self.__svn_filepath, '--non-interactive']
+        cmd = [self.__svn_filepath]
 
         if self.__trust_cert:
-            cmd += ['--trust-server-cert']
+            args += ['--trust-server-cert']
 
         if self.__username is not None and self.__password is not None:
-            cmd += ['--username', self.__username]
-            cmd += ['--password', self.__password]
-            cmd += ['--no-auth-cache']
+            args += ['--username', self.__username]
+            args += ['--password', self.__password]
+            args += ['--no-auth-cache']
+
+        if not subcommand == 'copy': args += ['--non-interactive']
 
         cmd += [subcommand] + args
         return self.external_command(cmd, environment=self.__env, **kwargs)
@@ -592,6 +595,37 @@ class CommonClient(svn.common_base.CommonBase):
 
         return self.__url_or_path
 
+    def branch(self, destination, rel_path=None, revision=None, message=None, file=None, intermediate_directories=False):
+        cmd = []
+
+        if svn.utility.is_url(self.__url_or_path):
+            full_url_or_path = self.__url_or_path
+            if rel_path is not None:
+                full_url_or_path += '/' + rel_path
+            cmd = [full_url_or_path]
+        else:
+            cmd = [self.url()]
+
+        cmd += [destination]
+
+        if message is not None:
+            cmd += ['-m', f'"{message}"']
+
+        if file is not None:
+            cmd += ['-F', file]
+
+        if revision is not None:
+            cmd += ['-r', str(revision)]
+
+        if intermediate_directories is True:
+            cmd += ['--parents']
+
+        result = self.run_command(
+            'copy',
+            cmd,
+            do_combine=True)
+        return result
+
     def origin(self, rel_path=None):
         for e in self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False) if not rel_path else self.log_default(stop_on_copy=True, revision_from=0, revision_to='HEAD', limit=1, changelist=True, xml=False, rel_path=None):
             e = os.linesep.join([s for s in e.splitlines() if s])
@@ -601,3 +635,6 @@ class CommonClient(svn.common_base.CommonBase):
                     r = re.search('(?<=from\s).*(?=:)', l)
                     if r:
                         return r.group(0)
+
+    def url(self, rel_path=None):
+        return self.info()['url']
