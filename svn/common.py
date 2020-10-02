@@ -596,8 +596,6 @@ class CommonClient(svn.common_base.CommonBase):
         return self.__url_or_path
 
     def branch(self, destination, rel_path=None, revision=None, message=None, file=None, intermediate_directories=False):
-        cmd = []
-
         if svn.utility.is_url(self.__url_or_path):
             full_url_or_path = self.__url_or_path
             if rel_path is not None:
